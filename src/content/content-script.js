@@ -5,7 +5,11 @@
 import { getAllProfiles, isPaused } from '../lib/storage.js'
 import { profileMatchesUrl, activeProfilesForUrl } from '../lib/matcher.js'
 import { applyProfile, removeProfile, appliedProfileIds } from './apply.js'
+import { initStorageBridge } from './storage-bridge.js'
 import { MSG } from '../lib/messaging.js'
+
+// Let page-world scripts reach their isolated per-profile storage.
+initStorageBridge()
 
 async function applyAll() {
   if (await isPaused()) return

@@ -3,6 +3,7 @@
 // delegates JS execution to the background service worker (MAIN world).
 
 import { MSG, sendToBackground } from '../lib/messaging.js'
+import { ensureProfileDataSeed } from '../lib/storage.js'
 
 // profileId -> { styleEl, htmlRoot }
 const applied = new Map()
@@ -78,7 +79,7 @@ async function runJs(profile) {
     type: MSG.RUN_JS,
     code: profile.js,
     profileId: profile.id,
-    context: { settings: profile.settings || {}, storage: profile.storage || {}, name: profile.name },
+    context: { settings: profile.settings || {}, name: profile.name },
   })
 }
 
@@ -86,6 +87,8 @@ async function runJs(profile) {
 export async function applyProfile(profile) {
   // Remove any previous application first (idempotent / live re-apply).
   removeProfile(profile.id)
+  // Initialize live storage from the profile's Storage-tab defaults (once).
+  await ensureProfileDataSeed(profile.id, profile.storage)
   const styleEl = injectCss(profile)
   const htmlRoot = await injectHtml(profile)
   applied.set(profile.id, { styleEl, htmlRoot })

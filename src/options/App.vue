@@ -1,14 +1,21 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import ProfileList from './components/ProfileList.vue'
 import ProfileEditor from './components/ProfileEditor.vue'
 import { useProfiles } from './composables/useProfiles.js'
+import { consumeOpenEditor } from '../lib/storage.js'
 import { createDefaultProfile, serializeProfile, serializeBackup, parseImport } from '../lib/profile.js'
 
 const { profiles, paused, saveProfile, removeProfile, duplicateProfile, importProfiles, togglePaused } = useProfiles()
 
 const editingId = ref(null)
 const editingProfile = computed(() => profiles.value.find((p) => p.id === editingId.value) || null)
+
+// The popup can request that we open straight into a specific profile's editor.
+onMounted(async () => {
+  const id = await consumeOpenEditor()
+  if (id) editingId.value = id
+})
 
 // Theme (dark by default), persisted in localStorage.
 const dark = ref(localStorage.getItem('webmod:theme') !== 'light')

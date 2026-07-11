@@ -4,12 +4,18 @@ import { normalizeProfile, newId } from './profile.js'
 
 const PROFILES_KEY = 'webmod:profiles'
 const PAUSED_KEY = 'webmod:paused'
+const DATA_PREFIX = 'webmod:data:' // live per-profile key/value store
+const DATA_INIT_PREFIX = 'webmod:data-init:' // "seed applied" flag per profile
+const OPEN_EDITOR_KEY = 'webmod:open-editor' // transient deep-link from popup -> dashboard
 
 function rawGet(keys) {
   return new Promise((resolve) => chrome.storage.local.get(keys, resolve))
 }
 function rawSet(obj) {
   return new Promise((resolve) => chrome.storage.local.set(obj, resolve))
+}
+function rawRemove(keys) {
+  return new Promise((resolve) => chrome.storage.local.remove(keys, resolve))
 }
 
 // Strip framework reactivity (Vue proxies) and any non-clonable wrappers so the
@@ -49,10 +55,11 @@ export async function saveProfile(profile) {
   return p
 }
 
-/** Remove a profile by id. */
+/** Remove a profile by id (and its live storage). */
 export async function removeProfile(id) {
   const list = await getAllProfiles()
   await writeAll(list.filter((p) => p.id !== id))
+  await rawRemove([DATA_PREFIX + id, DATA_INIT_PREFIX + id])
 }
 
 /** Duplicate a profile (new id, "(copy)" name). Returns the new profile. */
@@ -95,4 +102,46 @@ export function onChange(cb) {
   return () => chrome.storage.onChanged.removeListener(listener)
 }
 
-export const KEYS = { PROFILES_KEY, PAUSED_KEY }
+// --- Live per-profile key/value storage (isolated per profile) ---------------
+
+/** Read a profile's live storage object (always an object). */
+export async function getProfileData(id) {
+  const key = DATA_PREFIX + id
+  const data = await rawGet(key)
+  const obj = data[key]
+  return obj && typeof obj === 'object' ? obj : {}
+}
+
+/** Overwrite a profile's live storage object. */
+export async function setProfileData(id, obj) {
+  await rawSet({ [DATA_PREFIX + id]: toPlain(obj || {}) })
+}
+
+/** Seed a profile's live storage from its Storage-tab defaults, once. */
+export async function ensureProfileDataSeed(id, seed) {
+  const initKey = DATA_INIT_PREFIX + id
+  const flag = await rawGet(initKey)
+  if (flag[initKey]) return
+  await rawSet({ [DATA_PREFIX + id]: toPlain(seed || {}), [initKey]: true })
+}
+
+/** Reset a profile's live storage back to the given seed (defaults). */
+export async function resetProfileData(id, seed) {
+  await rawSet({ [DATA_PREFIX + id]: toPlain(seed || {}), [DATA_INIT_PREFIX + id]: true })
+}
+
+// --- Deep-link: popup asks the dashboard to open a specific profile ----------
+
+export async function requestOpenEditor(id) {
+  await rawSet({ [OPEN_EDITOR_KEY]: id })
+}
+
+/** Read-and-clear the pending "open this profile in the editor" request. */
+export async function consumeOpenEditor() {
+  const d = await rawGet(OPEN_EDITOR_KEY)
+  const id = d[OPEN_EDITOR_KEY]
+  if (id) await rawRemove(OPEN_EDITOR_KEY)
+  return id || null
+}
+
+export const KEYS = { PROFILES_KEY, PAUSED_KEY, DATA_PREFIX, DATA_INIT_PREFIX }

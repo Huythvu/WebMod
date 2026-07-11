@@ -3,6 +3,7 @@
 import { ref, reactive, computed, watch, toRaw } from 'vue'
 import CodeEditor from './CodeEditor.vue'
 import { HTML_POSITIONS, MATCH_TYPES } from '../../lib/profile.js'
+import { resetProfileData } from '../../lib/storage.js'
 import { useProfiles } from '../composables/useProfiles.js'
 
 const props = defineProps({
@@ -87,6 +88,20 @@ function formatJson(which) {
   }
 }
 
+const storageReset = ref('')
+async function resetLiveStorage() {
+  let seed
+  try {
+    seed = storageText.value.trim() ? JSON.parse(storageText.value) : {}
+  } catch (e) {
+    storageError.value = 'Invalid JSON: ' + e.message
+    return
+  }
+  await resetProfileData(draft.id, seed)
+  storageReset.value = 'Live storage reset to these defaults.'
+  setTimeout(() => (storageReset.value = ''), 2500)
+}
+
 const saveLabel = computed(() =>
   saveState.value === 'saving' ? 'Saving…' : saveState.value === 'error' ? 'Save error' : 'All changes saved'
 )
@@ -167,8 +182,11 @@ const saveLabel = computed(() =>
       <!-- JavaScript -->
       <div v-show="activeTab === 'JavaScript'" class="pane">
         <p class="hint">
-          Runs in the page. A <code>webmod</code> helper (with <code>settings</code>, <code>storage</code>,
-          <code>log()</code>) is available as the first argument.
+          Runs in the page as an async function — top-level <code>await</code> is supported. The
+          <code>webmod</code> helper is the first argument: DOM (<code>$</code>, <code>waitFor</code>,
+          <code>create</code>, <code>injectCSS/HTML</code>), UI (<code>toast</code>, <code>modal</code>,
+          <code>dialog</code>), <code>storage</code> (async get/set), <code>settings</code>, and utils
+          (<code>clipboard</code>, <code>download</code>, <code>url</code>, <code>log</code>).
         </p>
         <CodeEditor v-model="draft.js" language="javascript" :dark="dark" />
       </div>
@@ -186,11 +204,20 @@ const saveLabel = computed(() =>
       <!-- Storage -->
       <div v-show="activeTab === 'Storage'" class="pane">
         <div class="pane-opts">
-          <p class="hint">Seed data exposed to the script as <code>webmod.storage</code>.</p>
-          <button class="link" @click="formatJson('storage')">Format JSON</button>
+          <p class="hint">
+            Default (seed) data for this profile's live storage. The script reads and writes it at
+            runtime via <code>await webmod.storage.get/set(...)</code>; changes persist per profile.
+          </p>
+          <div class="opt-btns">
+            <button class="link" @click="resetLiveStorage" title="Overwrite live storage with these defaults">
+              Reset live storage
+            </button>
+            <button class="link" @click="formatJson('storage')">Format JSON</button>
+          </div>
         </div>
         <CodeEditor v-model="storageText" language="javascript" :dark="dark" />
         <p v-if="storageError" class="err">{{ storageError }}</p>
+        <p v-if="storageReset" class="hint">{{ storageReset }}</p>
       </div>
     </div>
   </div>
@@ -311,6 +338,11 @@ const saveLabel = computed(() =>
   gap: 16px;
   align-items: flex-end;
   justify-content: space-between;
+}
+.opt-btns {
+  display: flex;
+  gap: 14px;
+  flex: 0 0 auto;
 }
 .hint {
   font-size: 12px;

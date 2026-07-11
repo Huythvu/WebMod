@@ -18,16 +18,41 @@ Each profile is completely independent.
 - **Injection** — custom **CSS**, custom **HTML** (at beginning/end of `<body>`, or before/after/inside a target selector), and custom **JavaScript** that runs in the page's real context.
 - **Built-in editor** — CodeMirror 6 with per-language syntax highlighting (HTML/CSS/JS), undo/redo, search & replace, auto-save, and a light/dark theme.
 - **Live development** — saving in the editor re-applies CSS/HTML to open matching tabs instantly (JS re-runs) — no reload or browser restart.
-- **Settings & Storage tabs** — seed JSON data exposed to your script as `webmod.settings` / `webmod.storage`.
+- **Built-in helper API** — scripts receive a `webmod` object with DOM, UI, storage, and utility helpers (see below) so you write far less boilerplate.
+- **Per-profile persistent storage** — isolated key/value store the script reads and writes at runtime (`await webmod.storage.set/get`), seeded from the Storage tab.
 - **Import / Export / Backup** — save a single profile or back up all profiles as JSON, and re-import them.
-- **Popup** — see which profiles match the current tab, toggle them, and **pause all** customizations globally.
+- **Popup** — see which profiles match the current tab, toggle them, **create a profile pre-targeted at the current site** in one click, and **pause all** customizations globally.
+
+## Built-in helper API
+
+Your JavaScript runs as an async function (top-level `await` works) and receives `webmod` as its first argument:
+
+```js
+// Wait for an element, then add a button that persists a counter across reloads.
+const bar = await webmod.waitFor('#header')
+const count = (await webmod.storage.get('clicks')) || 0
+const btn = webmod.create('button', { text: `Clicked ${count}`, onclick: async () => {
+  const n = ((await webmod.storage.get('clicks')) || 0) + 1
+  await webmod.storage.set('clicks', n)
+  webmod.toast(`Saved: ${n}`, { type: 'success' })
+} })
+bar.appendChild(btn)
+```
+
+| Group | Helpers |
+|---|---|
+| **DOM** | `$`, `$$`, `waitFor`, `onMutation`, `create`, `injectCSS`, `injectHTML`, `onReady` |
+| **UI** | `toast`, `modal`, `dialog` (rendered in a shadow root, isolated from page CSS) |
+| **Storage** | `storage.get/set/remove/keys/getAll/clear` (async, persistent, per-profile) |
+| **Utils** | `log`/`warn`/`error`, `sleep`, `debounce`, `throttle`, `download`, `clipboard`, `url` |
+| **Context** | `id`, `name`, `settings` (read-only, from the Settings tab) |
 
 ## How injection works (MV3)
 
 MV3 content scripts run in an isolated world and can't run page-scoped JS. WebMod splits the work:
 
-- The **content script** (`src/content/`) reads profiles from `chrome.storage.local`, matches the URL, and injects **CSS** (`<style>`) and **HTML** (DOM nodes) directly. It tracks injected nodes per profile so they can be cleanly removed on re-apply or disable.
-- For **JavaScript**, it messages the **background service worker** (`src/background/`), which uses `chrome.scripting.executeScript({ world: 'MAIN' })` to run your code in the page's real JS context (this also bypasses the page's CSP). Your code receives a small `webmod` helper (`settings`, `storage`, `log()`).
+- The **content script** (`src/content/`) reads profiles from `chrome.storage.local`, matches the URL, and injects **CSS** (`<style>`) and **HTML** (DOM nodes) directly. It tracks injected nodes per profile so they can be cleanly removed on re-apply or disable. It also hosts the **storage bridge** that services the API's `webmod.storage` calls.
+- For **JavaScript**, it messages the **background service worker** (`src/background/`), which uses `chrome.scripting.executeScript({ world: 'MAIN' })` to run your code in the page's real JS context (this also bypasses the page's CSP). The `webmod` helper API is built there (`src/background/user-runtime.js`); storage calls hop back to the content script over `window.postMessage`.
 
 Because it customizes arbitrary sites, WebMod requests the `<all_urls>` host permission. Profiles only execute on pages that match their own rules, and the popup's **Pause all** toggle disables every profile at once.
 
@@ -36,11 +61,11 @@ Because it customizes arbitrary sites, WebMod requests the `<all_urls>` host per
 ```
 src/
   manifest.config.js      MV3 manifest (via @crxjs/vite-plugin)
-  background/             service worker — runs user JS in MAIN world, broadcasts live re-apply
-  content/                content script + injection engine (CSS/HTML + cleanup registry)
+  background/             service worker (live re-apply broadcast) + user-runtime.js (webmod API)
+  content/                content script, injection engine (CSS/HTML), storage bridge
   lib/                    storage, URL matcher, profile schema/validation, messaging
   options/                Vue dashboard + CodeMirror editor
-  popup/                  Vue popup (active profiles, quick toggles, pause-all)
+  popup/                  Vue popup (active profiles, quick toggles, create-for-site, pause-all)
 public/icons/             extension icons
 ```
 
@@ -61,9 +86,9 @@ Then load it in the browser:
 
 ### Try it
 
-1. Open the dashboard, create a profile matching `example.com` (domain rule).
-2. Add CSS (`body { background: tomato }`), some HTML at *End of `<body>`*, and JS (`webmod.log('hi'); document.title = 'WebMod ✓'`).
-3. Visit `https://example.com` — the changes apply. Edit CSS in the dashboard and watch the open tab update live.
+1. Visit `https://example.com`, open the popup, and click **＋ New profile for example.com** — it creates a profile pre-targeted at the site and opens the editor.
+2. Add CSS (`body { background: tomato }`), some HTML at *End of `<body>`*, and JS (`webmod.toast('hi from WebMod', { type: 'success' }); document.title = 'WebMod ✓'`).
+3. Go back to the tab — the changes apply. Edit CSS in the dashboard and watch the open tab update live.
 
 ## Tech stack
 

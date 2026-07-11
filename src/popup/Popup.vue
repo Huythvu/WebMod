@@ -1,13 +1,24 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { getAllProfiles, isPaused, setPaused, saveProfile } from '../lib/storage.js'
+import { ref, computed, onMounted } from 'vue'
+import { getAllProfiles, isPaused, setPaused, saveProfile, requestOpenEditor } from '../lib/storage.js'
 import { profileMatchesUrl } from '../lib/matcher.js'
+import { createDefaultProfile } from '../lib/profile.js'
 import { MSG, sendToBackground } from '../lib/messaging.js'
 
 const url = ref('')
 const matching = ref([]) // profiles whose rules match the current tab
 const paused = ref(false)
 const loading = ref(true)
+
+// The host of the current tab, if it's a normal web page (not chrome://, etc.).
+const host = computed(() => {
+  try {
+    const u = new URL(url.value)
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.hostname : ''
+  } catch {
+    return ''
+  }
+})
 
 async function load() {
   loading.value = true
@@ -17,6 +28,19 @@ async function load() {
   url.value = tab?.url || ''
   matching.value = url.value ? profiles.filter((pr) => profileMatchesUrl(pr, url.value)) : []
   loading.value = false
+}
+
+// Create a profile pre-targeted at the current site, then open it in the editor.
+async function createForThisSite() {
+  if (!host.value) return
+  const profile = createDefaultProfile({
+    name: host.value,
+    matches: [{ type: 'domain', value: host.value }],
+  })
+  const saved = await saveProfile(profile)
+  await requestOpenEditor(saved.id)
+  chrome.runtime.openOptionsPage()
+  window.close()
 }
 
 async function toggle(profile) {
@@ -55,6 +79,10 @@ onMounted(load)
     <div class="body">
       <p v-if="loading" class="muted">Loading…</p>
       <template v-else>
+        <button v-if="host" class="create" @click="createForThisSite">
+          ＋ New profile for <strong>{{ host }}</strong>
+        </button>
+
         <p class="section">Profiles matching this page</p>
         <p v-if="matching.length === 0" class="muted">No profiles match this page.</p>
         <ul v-else>
@@ -104,6 +132,20 @@ header .open {
   cursor: pointer;
 }
 .body { margin-top: 12px; }
+.create {
+  width: 100%;
+  background: #4f7cff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: 14px;
+  text-align: center;
+}
+.create strong { font-weight: 600; }
+.create:hover { filter: brightness(1.08); }
 .section {
   font-size: 12px;
   color: #9aa1ad;

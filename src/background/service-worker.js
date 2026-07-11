@@ -4,31 +4,7 @@
 
 import { MSG, sendToTab } from '../lib/messaging.js'
 import { profileMatchesUrl } from '../lib/matcher.js'
-
-/**
- * Executed in the page's MAIN world. Receives the user's code string plus a
- * read-only context object, exposes a minimal `webmod` global, and runs the code.
- * Kept self-contained (no imports) because it is serialized and injected.
- */
-function runUserCode(code, context, profileId) {
-  try {
-    const g = window
-    g.webmod = g.webmod || {}
-    g.webmod[profileId] = {
-      id: profileId,
-      name: context.name,
-      settings: context.settings || {},
-      storage: context.storage || {},
-      log: (...args) => console.log('[WebMod:' + context.name + ']', ...args),
-    }
-    // Expose the current profile's helpers as `webmod` for convenience inside the script.
-    const api = g.webmod[profileId]
-    const fn = new Function('webmod', 'settings', 'storage', code)
-    fn(api, api.settings, api.storage)
-  } catch (err) {
-    console.error('[WebMod] script error:', err)
-  }
-}
+import { runUserCode } from './user-runtime.js'
 
 async function runJsInTab(tabId, code, profileId, context) {
   try {
