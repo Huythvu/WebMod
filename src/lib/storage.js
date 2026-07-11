@@ -12,6 +12,13 @@ function rawSet(obj) {
   return new Promise((resolve) => chrome.storage.local.set(obj, resolve))
 }
 
+// Strip framework reactivity (Vue proxies) and any non-clonable wrappers so the
+// value is a plain, structured-clonable object before it reaches chrome.storage
+// or a cross-context message. Profiles hold only JSON-serializable data.
+function toPlain(value) {
+  return JSON.parse(JSON.stringify(value))
+}
+
 /** Get all profiles (array). Always returns an array. */
 export async function getAllProfiles() {
   const data = await rawGet(PROFILES_KEY)
@@ -25,15 +32,16 @@ export async function getProfile(id) {
   return list.find((p) => p.id === id) || null
 }
 
-/** Persist the full profile array. */
+/** Persist the full profile array (always as plain, clonable objects). */
 async function writeAll(list) {
-  await rawSet({ [PROFILES_KEY]: list })
+  await rawSet({ [PROFILES_KEY]: toPlain(list) })
 }
 
-/** Insert or update a profile. Returns the saved profile. */
+/** Insert or update a profile. Returns the saved (plain) profile. */
 export async function saveProfile(profile) {
   const list = await getAllProfiles()
-  const p = { ...profile, updatedAt: new Date().toISOString() }
+  // De-proxy up front so the stored list and the returned value are both plain.
+  const p = { ...toPlain(profile), updatedAt: new Date().toISOString() }
   const idx = list.findIndex((x) => x.id === p.id)
   if (idx >= 0) list[idx] = p
   else list.push(p)

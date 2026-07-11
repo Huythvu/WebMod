@@ -20,10 +20,10 @@ async function load() {
 }
 
 async function toggle(profile) {
-  const updated = { ...profile, enabled: !profile.enabled }
-  await saveProfile(updated)
+  // saveProfile returns a plain (de-proxied) profile — safe to send across contexts.
+  const saved = await saveProfile({ ...profile, enabled: !profile.enabled })
   // Live-apply to the current tab.
-  sendToBackground({ type: MSG.PROFILE_SAVED, profile: updated })
+  sendToBackground({ type: MSG.PROFILE_SAVED, profile: saved })
   await load()
 }
 
