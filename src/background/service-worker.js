@@ -5,9 +5,17 @@
 import { MSG, sendToTab } from '../lib/messaging.js'
 import { profileMatchesUrl } from '../lib/matcher.js'
 import { runUserCode } from './user-runtime.js'
+import { componentsRuntime } from './components-runtime.js'
 
 async function runJsInTab(tabId, code, profileId, context) {
   try {
+    // Ensure the reusable component library is present in the page's MAIN world
+    // (self-guarded, so this is a cheap no-op after the first injection per tab).
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: componentsRuntime,
+    })
     await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',

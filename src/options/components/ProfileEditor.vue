@@ -71,6 +71,30 @@ watch(() => JSON.stringify(draft), scheduleSave, { deep: false })
 watch(settingsText, scheduleSave)
 watch(storageText, scheduleSave)
 
+// "Insert component" starter snippets for the JS editor.
+const SNIPPETS = {
+  toast: `webmod.ui.toast('Hello', { type: 'success' })`,
+  button: `const btn = webmod.ui.button({ text: 'Click me', onClick: () => webmod.ui.toast('clicked') })\ndocument.body.appendChild(btn)`,
+  card: `const card = webmod.ui.card({ title: 'Title', body: 'Body text', footer: 'Footer' })\ndocument.body.appendChild(card)`,
+  modal: `webmod.ui.modal('<h3>Hello</h3><p>Modal content</p>')`,
+  toolbar: `webmod.ui.toolbar({ items: [{ text: 'Action', onClick: () => webmod.ui.toast('hi') }] })`,
+  sidebar: `const sb = webmod.ui.sidebar({ title: 'Panel', content: '<p>Content</p>', side: 'right' })`,
+  searchBox: `const s = webmod.ui.searchBox({ placeholder: 'Search…', onInput: (v) => webmod.log(v) })\ndocument.body.appendChild(s)`,
+  dropdown: `const d = webmod.ui.dropdown({ options: ['A', 'B', 'C'], onChange: (v) => webmod.log(v) })\ndocument.body.appendChild(d)`,
+  checkbox: `const c = webmod.ui.checkbox({ label: 'Enable', checked: false, onChange: (v) => webmod.log(v) })\ndocument.body.appendChild(c)`,
+  tabs: `const t = webmod.ui.tabs({ tabs: [{ label: 'One', content: 'first' }, { label: 'Two', content: 'second' }] })\ndocument.body.appendChild(t.element)`,
+  accordion: `const a = webmod.ui.accordion({ items: [{ title: 'Section', content: 'body' }] })\ndocument.body.appendChild(a.element)`,
+  table: `const tbl = webmod.ui.table({ columns: ['Name', 'Age'], rows: [['Alice', 30], ['Bob', 25]] })\ndocument.body.appendChild(tbl.element)`,
+  progress: `const p = webmod.ui.progress({ value: 40 })\ndocument.body.appendChild(p.element)\n// later: p.set(80)`,
+}
+const SNIPPET_KEYS = Object.keys(SNIPPETS)
+const jsEditor = ref(null)
+function insertSnippet(e) {
+  const key = e.target.value
+  e.target.value = ''
+  if (key && jsEditor.value) jsEditor.value.insert(SNIPPETS[key] + '\n')
+}
+
 const MATCH_HINTS = {
   domain: 'example.com — also matches www. and other subdomains',
   subdomain: 'app.example.com — this exact host only',
@@ -190,14 +214,19 @@ const saveLabel = computed(() =>
 
       <!-- JavaScript -->
       <div v-show="activeTab === 'JavaScript'" class="pane">
-        <p class="hint">
-          Runs in the page as an async function — top-level <code>await</code> is supported. The
-          <code>webmod</code> helper is the first argument: DOM (<code>$</code>, <code>waitFor</code>,
-          <code>create</code>, <code>injectCSS/HTML</code>), UI (<code>toast</code>, <code>modal</code>,
-          <code>dialog</code>), <code>storage</code> (async get/set), <code>settings</code>, and utils
-          (<code>clipboard</code>, <code>download</code>, <code>url</code>, <code>log</code>).
-        </p>
-        <CodeEditor v-model="draft.js" language="javascript" :dark="dark" />
+        <div class="pane-opts">
+          <p class="hint">
+            Runs in the page as an async function — top-level <code>await</code> is supported. The
+            <code>webmod</code> helper is the first argument: DOM (<code>$</code>, <code>waitFor</code>,
+            <code>create</code>, <code>injectCSS/HTML</code>), UI components (<code>webmod.ui.*</code>),
+            <code>storage</code> (async get/set), <code>settings</code>, and utils.
+          </p>
+          <select class="insert-menu" @change="insertSnippet">
+            <option value="">Insert component…</option>
+            <option v-for="key in SNIPPET_KEYS" :key="key" :value="key">{{ key }}</option>
+          </select>
+        </div>
+        <CodeEditor ref="jsEditor" v-model="draft.js" language="javascript" :dark="dark" />
       </div>
 
       <!-- Settings -->
@@ -352,6 +381,16 @@ const saveLabel = computed(() =>
   display: flex;
   gap: 14px;
   flex: 0 0 auto;
+}
+.insert-menu {
+  flex: 0 0 auto;
+  background: var(--wm-input);
+  border: 1px solid var(--wm-border);
+  border-radius: 6px;
+  color: var(--wm-text);
+  padding: 6px 9px;
+  font-size: 12px;
+  cursor: pointer;
 }
 .hint {
   font-size: 12px;

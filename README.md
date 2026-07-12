@@ -42,10 +42,26 @@ bar.appendChild(btn)
 | Group | Helpers |
 |---|---|
 | **DOM** | `$`, `$$`, `waitFor`, `onMutation`, `create`, `injectCSS`, `injectHTML`, `onReady` |
-| **UI** | `toast`, `modal`, `dialog` (rendered in a shadow root, isolated from page CSS) |
+| **UI** | `toast`, `modal`, `dialog` (shadow-root isolated) + the component library under `ui.*` (below) |
 | **Storage** | `storage.get/set/remove/keys/getAll/clear` (async, persistent, per-profile) |
 | **Utils** | `log`/`warn`/`error`, `sleep`, `debounce`, `throttle`, `download`, `clipboard`, `url` |
 | **Context** | `id`, `name`, `settings` (read-only, from the Settings tab) |
+
+### Component library (`webmod.ui.*`)
+
+Prebuilt, styled UI components so scripts don't rebuild common pieces. Static components return a DOM `Element` you place anywhere; interactive ones return a small controller. The editor's **Insert component** menu (JS tab) drops in starter snippets.
+
+```js
+webmod.ui.toolbar({ items: [{ text: 'Hide ads', onClick: () => webmod.injectCSS('.ad{display:none}') }] })
+const t = webmod.ui.table({ columns: ['Name', 'Age'], rows: [['Alice', 30], ['Bob', 25]] })
+document.body.appendChild(t.element)
+```
+
+| Returns `Element` | Returns `{ element, ... }` controller |
+|---|---|
+| `button`, `card`, `searchBox`, `dropdown`, `checkbox` | `toolbar {remove}`, `sidebar {open,close,toggle,remove}`, `tabs {select}`, `accordion`, `table {setRows}`, `progress {set}` |
+
+Components render as normal DOM with `wm-`-prefixed classes and a shared stylesheet (dark theme). Unlike the shadow-isolated `toast`/`modal`/`dialog`, a page's own CSS *can* override them — scope or restyle as needed.
 
 ## How injection works (MV3)
 

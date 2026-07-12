@@ -304,6 +304,9 @@ export function runUserCode(code, context, profileId) {
     clipboard,
     url,
   }
+  // Merge the reusable component library (injected separately into MAIN world).
+  // Shadow-isolated primitives (toast/modal/dialog) stay available under ui too.
+  api.ui = Object.assign({ toast, modal, dialog }, w.__webmodComponents || {})
   w.webmod = w.webmod || {}
   w.webmod[profileId] = api
 

@@ -73,6 +73,14 @@ watch(
   () => props.dark,
   (dark) => view?.dispatch({ effects: themeComp.reconfigure(themeExt(dark)) })
 )
+
+// Insert text at the current cursor/selection (used by the "Insert component" menu).
+function insert(text) {
+  if (!view) return
+  view.dispatch(view.state.replaceSelection(text))
+  view.focus()
+}
+defineExpose({ insert })
 </script>
 
 <template>
