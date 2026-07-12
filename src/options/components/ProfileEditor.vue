@@ -71,6 +71,15 @@ watch(() => JSON.stringify(draft), scheduleSave, { deep: false })
 watch(settingsText, scheduleSave)
 watch(storageText, scheduleSave)
 
+const MATCH_HINTS = {
+  domain: 'example.com — also matches www. and other subdomains',
+  subdomain: 'app.example.com — this exact host only',
+  url: 'https://example.com/page — exact, query string matters',
+  glob: 'https://*.example.com/* — * is a wildcard',
+  regex: '^https://example\\.com/.*',
+}
+const matchPlaceholder = (type) => MATCH_HINTS[type] || 'example.com'
+
 function addMatch() {
   draft.matches.push({ type: 'domain', value: '' })
 }
@@ -143,7 +152,7 @@ const saveLabel = computed(() =>
           <select v-model="m.type">
             <option v-for="t in MATCH_TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
           </select>
-          <input v-model="m.value" type="text" placeholder="e.g. example.com" />
+          <input v-model="m.value" type="text" :placeholder="matchPlaceholder(m.type)" />
           <button class="icon" title="Remove" @click="removeMatch(i)">✕</button>
         </div>
       </div>
